@@ -198,9 +198,7 @@ def auth(key):
                     f"[!] 由于出现验证故障，正在使密钥 {activeSessionToken} 失效。 \n"
                 )
             else:
-                print(
-                    "[!] 受到注销会话请求，正在使会话密钥失效 \n"
-                )
+                print("[!] 收到注销会话请求，正在使会话密钥失效 \n")
             activeSessionToken = None
         return {"access": False, "token": None}
 
