@@ -227,7 +227,7 @@ def api():
     pwd = pwdSpec.prefix + hashPart + symbolPart + pwdSpec.suffix
 
     debugSleep()
-    return {"id": hashlib.md5(inputStr.encode("utf-8")).hexdigest(), "pwd": pwd}
+    return {"id": inputStr, "pwd": pwd}
 
 
 @app.route("/cfgStatus")
