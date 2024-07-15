@@ -4,6 +4,7 @@ import time, datetime, random, hashlib, sys, configparser, signal
 from utils import genfp
 from flask_cors import CORS
 
+# 配置读取
 config = configparser.ConfigParser()
 try:
     config.read("config.ini")
@@ -26,6 +27,7 @@ else:
 activeSessionToken = None
 tokenUpdateTime = None
 
+# 读取用户指纹，若没有指纹则进行生成
 while True:
     try:
         with open("./fingerprint", "rb") as file:
@@ -40,8 +42,8 @@ while True:
         continue
 
 
+# 存储密码特征信息
 class pwdSpec:
-
     try:
         set = str(config.get("pwd", "set"))
         rule = str(config.get("pwd", "rule"))
@@ -60,6 +62,7 @@ if pwdSpec.set == "false":
     print("[!] 服务器未正确配置。\n")
 
 
+# 生成10分钟有效期的会话令牌
 def generateToken():
     global activeSessionToken, tokenUpdateTime
     sKey = hashlib.md5(str(random.random()).encode()).hexdigest()
@@ -68,16 +71,20 @@ def generateToken():
     return sKey
 
 
+# 模拟延迟
 def debugSleep():
     time.sleep(globalDelay)
 
 
+# 获取服务器状态的接口
 @app.route("/ping")
 def index():
     debugSleep()
     return "Hello World"
 
 
+# 提交服务器配置的接口，目前没有前端与之配合
+# 说实话别的还可以，手动配置密码规则还是有点不直观的，用户友好的前端需要补齐
 @app.route("/submitConfig")
 def submitConfig():
     global config
@@ -104,6 +111,7 @@ def submitConfig():
     return fl.jsonify({"status": "success"})
 
 
+# 秘符验证接口（基于当前时间的动态密码）
 @app.route("/auth/<string:key>")
 def auth(key):
     global activeSessionToken, pwdSpec
@@ -196,6 +204,7 @@ def auth(key):
             if key != "-logout-":
                 print(
                     f"[!] 由于出现验证故障，正在使密钥 {activeSessionToken} 失效。 \n"
+                    # 安全措施，若另一个用户在别处输入了错误的密码则一刀切使所有会话失效，有待商榷？
                 )
             else:
                 print("[!] 收到注销会话请求，正在使会话密钥失效 \n")
@@ -203,6 +212,7 @@ def auth(key):
         return {"access": False, "token": None}
 
 
+# 获取密码的接口
 @app.route("/fetchKey")
 def api():
     # activeSessionToken 为实现会话有效期使用的动态 token
@@ -211,7 +221,9 @@ def api():
     token = fl.request.args.get("token")
     if token != activeSessionToken:
         fl.abort(403)
-    inputStr = fl.request.args.get("id").upper()  # 该 id 参数为用户提供的平台名称
+    inputStr = fl.request.args.get(
+        "id"
+    ).upper()  # 该变量为用户提供的平台名称的 SHA1 不可逆加密结果
     calcid = f"{inputStr}-{fingerprint}"
     symbols = ["!", "@", "#", "$", "&", "%", "/"]  # 使用符号增加密码复杂度
     hashPart = hashlib.sha256(calcid.encode(encoding="utf-8")).hexdigest()[
@@ -230,6 +242,7 @@ def api():
     return {"id": inputStr, "pwd": pwd}
 
 
+# 获取服务器配置状态的接口
 @app.route("/cfgStatus")
 def getIsConfigured():
     global pwdSpec
@@ -239,6 +252,7 @@ def getIsConfigured():
         return fl.jsonify({"configured": False})
 
 
+# 重置会话令牌的函数
 def resetActiveSessionToken():
     global activeSessionToken, tokenUpdateTime
     now = datetime.datetime.now()
@@ -246,11 +260,12 @@ def resetActiveSessionToken():
     if activeSessionToken is None:
         return
     if activeSessionToken is not None and now > tokenUpdateTime + expiry:
-        print(f"\n[!] Active session token {activeSessionToken} expired. \n")
+        print(f"\n[!] 活动的会话令牌 {activeSessionToken} 已过期。 \n")
         activeSessionToken = None
         tokenUpdateTime = None
 
 
+# 定期expire会话令牌的线程
 def activeSessionTokenMonitor():
     while True:
         resetActiveSessionToken()
@@ -261,8 +276,9 @@ sessionTokenMonitor = Thread(target=activeSessionTokenMonitor, daemon=True)
 sessionTokenMonitor.start()
 
 
+# ^C处理函数
 def signalHandler(signal, frame):
-    print("\n[!] Quitting (triggered by Ctrl + C)")
+    print("\n[!] 正在退出")
     sys.exit(0)
 
 
