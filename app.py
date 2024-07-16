@@ -117,31 +117,12 @@ def auth(key):
     global activeSessionToken, pwdSpec
     now = datetime.datetime.now()
     year = str(now.year % 100)
-    month = now.month
-    if month < 10:
-        month = "0" + str(month)
-    else:
-        month = str(month)
-    day = now.day
-    if day < 10:
-        day = "0" + str(day)
-    else:
-        day = str(day)
-    hour = now.hour
-    if hour < 10:
-        hour = "0" + str(hour)
-    else:
-        hour = str(hour)
-    minute = now.minute
-    if minute < 10:
-        minute = "0" + str(minute)
-    else:
-        minute = str(minute)
-    second = now.second
-    if second < 10:
-        second = "0" + str(second)
-    else:
-        second = str(second)
+    year = str(now.year % 100)
+    month = str(now.month).zfill(2)
+    day = str(now.day).zfill(2)
+    hour = str(now.hour).zfill(2)
+    minute = str(now.minute).zfill(2)
+    second = str(now.second).zfill(2)
 
     class snippets:
         [d1, d2, d3, d4, d5, d6, t1, t2, t3, t4, t5, t6] = [
