@@ -26,15 +26,15 @@ else:
 
 activeSessionToken = None
 tokenUpdateTime = None
+fingerprintMD5 = None
 
 # 读取用户指纹，若没有指纹则进行生成
 while True:
     try:
         with open("./fingerprint", "rb") as file:
             fingerprint = file.read(4096).hex()
-            print(
-                f"\n[+] 已找到指纹。 文件的 md5 是 {hashlib.md5(fingerprint.encode('utf-8')).hexdigest()}\n"
-            )
+            fingerprintMD5 = hashlib.md5(fingerprint.encode("utf-8")).hexdigest()
+            print(f"\n[+] 已找到指纹。 文件的 md5 是 {fingerprintMD5}\n")
         break
     except Exception as e:
         print(f"\n[-] 未找到指纹。正在生成...\n")
@@ -53,6 +53,23 @@ class pwdSpec:
         sg1 = int(config.get("pwd", "seed1segment"))
         sg2 = int(config.get("pwd", "seed2segment"))
         suffix = str(config.get("pwd", "suffix"))
+    except BaseException:
+        print("\n[-] 配置已损坏。程序正在退出...\n")
+        sys.exit(0)
+
+
+def updateConfig():
+    global pwdSpec
+    config.read("config.ini")
+    try:
+        pwdSpec.set = str(config.get("pwd", "set"))
+        pwdSpec.rule = str(config.get("pwd", "rule"))
+        pwdSpec.host = str(config.get("pwd", "host"))
+        pwdSpec.prefix = str(config.get("pwd", "prefix"))
+        pwdSpec.hashlength = int(config.get("pwd", "hashlength"))
+        pwdSpec.sg1 = int(config.get("pwd", "seed1segment"))
+        pwdSpec.sg2 = int(config.get("pwd", "seed2segment"))
+        pwdSpec.suffix = str(config.get("pwd", "suffix"))
     except BaseException:
         print("\n[-] 配置已损坏。程序正在退出...\n")
         sys.exit(0)
@@ -79,15 +96,17 @@ def debugSleep():
 # 获取服务器状态的接口
 @app.route("/ping")
 def index():
+    global fingerprintMD5
     debugSleep()
-    return "Hello World"
+    return fl.jsonify({"fingerprint": fingerprintMD5, "setup": pwdSpec.set})
 
 
-# 提交服务器配置的接口，目前没有前端与之配合
-# 说实话别的还可以，手动配置密码规则还是有点不直观的，用户友好的前端需要补齐
 @app.route("/submitConfig")
 def submitConfig():
-    global config
+    global config, updateConfig, activeSessionToken
+
+    if (fl.request.args.get("token") != activeSessionToken) and pwdSpec.set == True:
+        fl.abort(403)
 
     class pwdConfigParams:
         dateTimeRule = str(fl.request.args.get("rule"))
@@ -106,7 +125,9 @@ def submitConfig():
     config.set("pwd", "suffix", pwdConfigParams.suffix)
     with open("config.ini", "w") as configfile:
         config.write(configfile)
-    print("\n[!] 配置文件已更改。请重启服务端来应用这些变化。\n")
+    print("\n[!] 配置文件已更改。\n")
+    updateConfig()
+    print("[i] 配置热重载完成。\n")
     debugSleep()
     return fl.jsonify({"status": "success"})
 
