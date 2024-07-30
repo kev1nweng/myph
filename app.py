@@ -18,8 +18,8 @@ CORS(app)
 
 
 class Debug:
-    enabled = True
-    simulatedDelay = 0
+    enabled = False
+    simulatedDelay = 2
 
     def sleep():
         time.sleep(Debug.simulatedDelay if Debug.enabled else 0)
