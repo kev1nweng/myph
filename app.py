@@ -114,7 +114,7 @@ def index():
 def submitConfig():
     global config, updateConfig, Runtime
 
-    if (fl.request.args.get("token") != Runtime.token.value) and Spec.set == True:
+    if (fl.request.args.get("token") == Runtime.token.value) and Spec.set == True:
         fl.abort(403)
 
     class pwdConfigParams:
