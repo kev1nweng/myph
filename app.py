@@ -1,6 +1,6 @@
 import flask as fl
 from threading import Thread
-import time, datetime, random, hashlib, sys, configparser, signal
+import time, datetime, random, hashlib, sys, configparser, signal, json
 from utils import genfp
 from flask_cors import CORS
 
@@ -17,8 +17,31 @@ app = fl.Flask(__name__)
 CORS(app)
 
 
+class Overrides:
+    data = None
+    symlinks = []
+    patches = []
+
+
+def updateOverrides():
+    try:
+        with open("overrides.json", "r") as file:
+            Overrides.data = json.load(file)
+            for i in Overrides.data.symlinks:
+                Overrides.symlinks.append({"origin": i.origin, "target": i.target})
+            for z in Overrides.data.patches:
+                Overrides.patches.append({"origin": z.origin, "content": z.content})
+
+    except Exception as e:
+        print("\n[-] 未找到 overrides 配置文件或其内容无效。将禁用该功能...\n")
+        Overrides.data = None
+        Overrides.symlinks = []
+        Overrides.patches = []
+        e  # 奇异搞笑
+
+
 class Debug:
-    enabled = False
+    enabled = True
     simulatedDelay = 1
 
     def sleep():
@@ -209,7 +232,7 @@ def auth(key):
 
     if key == dynamicComputedSequence:
         ntk = generateToken()
-        print(f"\n[+] Access granted for {Runtime.token.value}.\n")
+        print(f"\n[+] 已允许密钥 {Runtime.token.value} 的访问请求.\n")
         return {"access": True, "token": ntk}
     else:
         print(
@@ -222,42 +245,84 @@ def auth(key):
                     # 安全措施，若另一个用户在别处输入了错误的密码则一刀切使所有会话失效，有待商榷？
                 )
             else:
-                print("[!] 收到注销会话请求，正在使会话密钥失效 \n")
+                print("[!] 收到注销会话请求，正在使会话密钥失效...\n")
             Runtime.token.value = None
         return {"access": False, "token": None}
 
 
 # 获取密码的接口
 @app.route("/fetchKey")
-def api():
-    global Runtime
+def getPassword():
+    global Runtime, Overrides
     Runtime.token.accessBuffer += 1
     Runtime.antiBruteforce()
+
+    isOverrideApplied = False
 
     # activeSessionToken 为实现会话有效期使用的动态 token
     # pwdSpec 为包含了用户自定义密码规则的 class
     token = fl.request.args.get("token")
     if token != Runtime.token.value:
         fl.abort(401)
+
     inputStr = fl.request.args.get(
         "id"
     ).upper()  # 该变量为用户提供的平台名称的 SHA1 不可逆加密结果
+
+    for k in Overrides.symlinks:
+        if inputStr == k["origin"]:
+            inputStr = k["target"]
+            isOverrideApplied = True
+
     calcid = f"{inputStr}-{fingerprint}"
     symbols = ["!", "@", "#", "$", "&", "%", "/"]  # 使用符号增加密码复杂度
     hashPart = hashlib.sha256(calcid.encode(encoding="utf-8")).hexdigest()[
         : Spec.hashlength
     ]
+
     # 使用哈希序列的切片作为随机种子
     seeds = [hashPart[: Spec.sg1], hashPart[: Spec.sg2]]
     symbolPart = ""
     for seed in seeds:
         random.seed(seed)
         symbolPart += random.choice(symbols)
+
     # 凭借不同部分组成密码并返回
     pwd = Spec.prefix + hashPart + symbolPart + Spec.suffix
 
+    for x in Overrides.patches:
+        if inputStr == x["origin"]:
+            patch = x["content"].split("&")
+            for f in patch:
+                item = f.split[":"]
+                pwd = pwd[: (item[0])] + pwd[(len(pwd) - item[0]) :]
+                isOverrideApplied = True
+
     Debug.sleep()
-    return {"id": inputStr, "pwd": pwd}
+    return {"id": inputStr, "pwd": pwd, "override": isOverrideApplied}
+
+
+# 向服务器提交自定义覆写的接口
+@app.route("/submitOverride")
+def submitOverride():
+    token = fl.request.args.get("token")
+    if token != Runtime.token.value:
+        fl.abort(401)
+
+    try:
+        payloads = fl.request.args.get("payloads")
+        for g in payloads:
+            item = g.split("*")
+            if item[0] == "s":
+                Overrides.write("symlinks", item[1], item[2])
+                updateOverrides()
+            elif item[0] == "p":
+                Overrides.write("patches", item[1], item[2])
+                updateOverrides()
+    except Exception:
+        fl.abort(502)
+
+    return fl.jsonify({"status": "success"})
 
 
 # 获取服务器配置状态的接口
@@ -308,4 +373,5 @@ def signalHandler(signal, frame):
 signal.signal(signal.SIGINT, signalHandler)
 
 if __name__ == "__main__":
+    updateOverrides()
     app.run(host=Spec.host, port=4518, debug=Debug.enabled)
