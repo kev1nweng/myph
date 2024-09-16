@@ -1,0 +1,4 @@
+{
+  "symlinks": [{ "origin": "APPLEID", "target": "APPLE" }],
+  "patches": [{ "origin": "MICROSOFT", "content": "1:/" }]
+}
