@@ -25,7 +25,7 @@ class Overrides:
 
 def updateOverrides():
     try:
-        with open("overrides.json", "r") as file:
+        with open("overrides.json", "r", encoding="utf-8") as file:
             Overrides.data = json.load(file)
             for i in Overrides.data.symlinks:
                 Overrides.symlinks.append({"origin": i.origin, "target": i.target})
@@ -156,7 +156,7 @@ def submitConfig():
     config.set("pwd", "seed1segment", pwdConfigParams.seed1Segment)
     config.set("pwd", "seed2segment", pwdConfigParams.seed2Segment)
     config.set("pwd", "suffix", pwdConfigParams.suffix)
-    with open("config.ini", "w") as configfile:
+    with open("config.ini", "w", encoding="utf-8") as configfile:
         config.write(configfile)
     print("\n[!] 配置文件已更改。\n")
     updateConfig()
