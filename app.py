@@ -1,6 +1,6 @@
 import flask as fl
-from threading import Thread
 import time, datetime, random, hashlib, sys, configparser, signal, json
+from threading import Thread
 from utils import genfp
 from flask_cors import CORS
 
@@ -298,8 +298,11 @@ def getPassword():
                 pwd = pwd[: (item[0])] + pwd[(len(pwd) - item[0]) :]
                 isOverrideApplied = True
 
+
+    pwd_enc = 1
+
     Debug.sleep()
-    return {"id": inputStr, "pwd": pwd, "override": isOverrideApplied}
+    return {"id": inputStr, "pwd_enc": pwd, "override": isOverrideApplied}
 
 
 # 向服务器提交自定义覆写的接口
